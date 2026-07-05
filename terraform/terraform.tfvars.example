@@ -1,0 +1,11 @@
+# Example terraform.tfvars - Copy this file to terraform/terraform.tfvars and customize
+
+project_name         = "magic-movie-machine"
+environment           = "dev"
+aws_region            = "us-east-1"
+personalize_domain    = "VIDEO_ON_DEMAND"
+dataset_group_name   = "personalize-video-on-demand-ds-group"
+s3_bucket_prefix     = "mmm"
+kinesis_shard_count  = 1
+lambda_timeout       = 60
+lambda_memory        = 256
