@@ -5,41 +5,42 @@
 This Terraform configuration creates a complete serverless infrastructure for the Magic Movie Machine recommender system using AWS services:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────────────────────────────┐
 │                        WEB APPLICATION                          │
 │                    (React/Vue/Angular App)                      │
-└────────────┬─────────────────────────────────────────────────────┘
-             │
-             ├─────────────────────────────┬──────────────────────┐
-             │                             │                      │
-      [GET /recommendations]        [POST /events]          [SDK Integration]
-             │                             │                      │
-             ▼                             ▼                      ▼
-┌──────────────────────────────┐ ┌──────────────────┐  ┌─────────────────┐
-│   API GATEWAY REST API       │ │   API GATEWAY    │  │  Event SDK      │
-│  - /recommendations (GET)    │ │   → Kinesis      │  │  Client Library │
-│  - /recommendations (POST)   │ │     Integration  │  │                 │
-└────────────┬─────────────────┘ └─────────┬────────┘  └────────┬────────┘
-             │                             │                    │
-             │                    ┌────────▼─────────┐          │
-             │                    │  KINESIS STREAM  │◄─────────┘
-             │                    │  (User Events)   │
-             │                    └────────┬─────────┘
-             │                             │
-             │                    ┌────────▼─────────────────┐
-             │                    │  LAMBDA - Event Stream   │
-             │                    │  (Event Processing)      │
-             │                    └────────┬─────────────────┘
-             │                             │
-             ▼                             ▼
-    ┌─────────────────────┐      ┌──────────────────────────┐
-    │  LAMBDA - Rec API   │      │ PERSONALIZE - Events API │
-    │  (GetRecommendations│      │ (PutEvents)              │
-    │   GetPersonalizedRank)      │                          │
-    └────────┬────────────┘      └──────────┬───────────────┘
-             │                              │
-             ▼                              ▼
-    ┌──────────────────────────────────────────┐
+└──────────────────────────────┬──────────────────────────────────┘
+             ├─────────────────┼────────────────────┬──────────────┐
+             │                 │                    │              │
+      [GET /recommendations]  [POST /recommendations]  [SDK Integration]
+             │                 │                    │              │
+             ▼                 ▼                    ▼              ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│   API GATEWAY REST API       │ API GATEWAY    │  Event SDK      │
+│  - /recommendations (GET)    │ → Kinesis      │  Client Library │
+│  - /recommendations (POST)   │   Integration  │                 │
+└──────────────────────────────┼────────────────┼─────────────────┘
+             │                 │                │
+             │        ┌────────┴────────────────┤
+             │        │  KINESIS STREAM         │
+             │        │  (User Events)          │
+             │        └────────┬────────────────┘
+             │                 │
+             │        ┌────────┴──────────────────────┐
+             │        │  LAMBDA - Event Stream        │
+             │        │  (Event Processing)           │
+             │        └────────┬──────────────────────┘
+             │                 │
+             ▼                 ▼
+    ┌──────────────────┐  ┌────────────────────────────┐
+    │  LAMBDA - Rec API│  │ PERSONALIZE - Events API   │
+    │  (GetRecommendationsL  │ (PutEvents)                │
+    │   GetPersonalizedRank) │                            │
+    └────────┬─────────┘  └────────┬──────────────────┘
+             │                     │
+             └─────────────────────┘
+                       │
+                       ▼
+    ┌──────────────────────────────────────────────────────┐
     │    AMAZON PERSONALIZE                    │
     │  - Dataset Group (VIDEO_ON_DEMAND)       │
     │  - Datasets (Interactions/Items/Users)   │
@@ -48,7 +49,7 @@ This Terraform configuration creates a complete serverless infrastructure for th
     └────────┬─────────────────────────────────┘
              │
              ▼
-    ┌──────────────────────┐
+    ┌──────────────────────────────────────┐
     │   S3 BUCKET          │
     │   Training Data      │
     │  - interactions.csv  │
@@ -56,12 +57,12 @@ This Terraform configuration creates a complete serverless infrastructure for th
     │  - users.csv         │
     └──────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────────┐
 │              MONITORING & LOGGING (CloudWatch)                  │
 │  - API Gateway Logs                                             │
 │  - Lambda Function Logs                                         │
 │  - Alarms & Metrics                                             │
-└─────────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ## 📋 Prerequisites
@@ -114,7 +115,7 @@ The Terraform output will provide:
 
 ### Step 1: Prepare Your Data
 
-The notebook creates three CSV files:
+Run the Jupyter notebook (`Building the Magic Movie Machine Recommender.ipynb`) which creates three CSV files:
 
 **interactions.csv:**
 ```
@@ -168,7 +169,7 @@ Use the AWS Console or Jupyter notebook to:
 
 4. **Create Recommender**
    - Train the model
-   - Note the Campaign ARN
+   - Note the Campaign ARN and Tracking ID
 
 ### Step 4: Update Lambda Environment Variables
 
@@ -180,23 +181,25 @@ EVENT_LAMBDA=$(terraform output -raw event_stream_lambda_name)
 # Update Recommendation API Lambda
 aws lambda update-function-configuration \
   --function-name $REC_LAMBDA \
-  --environment Variables={PERSONALIZE_CAMPAIGN_ARN=arn:aws:personalize:REGION:ACCOUNT:campaign/YOUR_CAMPAIGN}
+  --environment Variables={PERSONALIZE_CAMPAIGN_ARN=arn:aws:personalize:REGION:ACCOUNT:campaign/YOUR_CAMPAIGN,REGION=us-east-1}
 
 # Update Event Stream Lambda
 aws lambda update-function-configuration \
   --function-name $EVENT_LAMBDA \
-  --environment Variables={DATASET_GROUP_ARN=arn:aws:personalize:REGION:ACCOUNT:dataset-group/YOUR_DATASET_GROUP,TRACKING_ID=YOUR_TRACKING_ID}
+  --environment Variables={DATASET_GROUP_ARN=arn:aws:personalize:REGION:ACCOUNT:dataset-group/YOUR_DATASET_GROUP,TRACKING_ID=YOUR_TRACKING_ID,REGION=us-east-1}
 ```
 
 ## 🔌 API Integration
 
 ### Get Recommendations
 
+**GET Request:**
 ```bash
-# GET request
 curl "https://API_ENDPOINT/recommendations?userId=1&numResults=10"
+```
 
-# POST request
+**POST Request:**
+```bash
 curl -X POST https://API_ENDPOINT/recommendations \
   -H "Content-Type: application/json" \
   -d '{
@@ -251,7 +254,7 @@ curl -X POST https://API_ENDPOINT/events \
 
   <script>
     // Configuration
-    const API_ENDPOINT = 'https://YOUR_API_ENDPOINT';
+    const API_ENDPOINT = 'https://YOUR_API_ENDPOINT/dev';
     const USER_ID = 'user123';
 
     // Initialize
@@ -318,7 +321,7 @@ curl -X POST https://API_ENDPOINT/events \
 </html>
 ```
 
-## 🔍 Monitoring
+## 📡 Monitoring
 
 ### CloudWatch Metrics
 
@@ -378,12 +381,19 @@ terraform destroy
 │   ├── lambda.tf             # Lambda functions
 │   ├── api_gateway.tf        # API Gateway configuration
 │   ├── cloudwatch.tf         # CloudWatch logs and alarms
-│   └── outputs.tf            # Terraform outputs
+│   ├── outputs.tf            # Terraform outputs
+│   ├── terraform.tfvars.example
+│   ├── deploy.sh             # Deployment script
+│   ├── cleanup.sh            # Cleanup script
+│   ├── .env.example          # Environment variables template
+│   └── README.md             # Detailed documentation
 ├── lambda_functions/
 │   ├── recommendation_api.py  # Recommendation Lambda
 │   └── event_stream.py        # Event stream Lambda
-├── terraform.tfvars          # Environment-specific variables (create this)
-└── README.md                 # This file
+├── INFRASTRUCTURE_ANALYSIS.md # What's included & missing
+├── OPTIONAL_FEATURES.md       # Enhancement suggestions
+├── CONTRIBUTING.md            # Contributing guidelines
+└── README.md                  # This file
 ```
 
 ## ⚙️ Customization
@@ -444,17 +454,7 @@ terraform apply -var="kinesis_shard_count=5"
 
 ### Cross-Origin Issues
 
-API Gateway CORS is automatically enabled. If issues persist:
-
-```bash
-# Add CORS headers manually
-aws apigateway put-integration-response \
-  --rest-api-id API_ID \
-  --resource-id RESOURCE_ID \
-  --http-method GET \
-  --status-code 200 \
-  --response-parameters 'method.response.header.Access-Control-Allow-Origin'='"*"'
-```
+API Gateway CORS is automatically enabled. If issues persist, verify headers in API Gateway console.
 
 ## 📚 Additional Resources
 
@@ -464,6 +464,146 @@ aws apigateway put-integration-response \
 - [API Gateway Best Practices](https://docs.aws.amazon.com/apigateway/latest/developerguide/)
 - [AWS Lambda Best Practices](https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html)
 
+## 🔄 Next Steps to Improve Your Infrastructure
+
+Your current MVP infrastructure is production-ready for a basic recommender system! As your project grows, consider these enhancements:
+
+### 1. **Authentication & Authorization** (When you need user-specific access)
+- Add API Key authentication
+- Implement IAM-based authorization
+- Integrate AWS Cognito for user management
+- Add OAuth 2.0 support
+
+**Estimated effort:** 2-4 hours
+**Cost impact:** Minimal ($0-5/month)
+
+### 2. **Caching Layer** (For faster response times)
+- Add DynamoDB cache for recommendations
+- Implement ElastiCache Redis for real-time caching
+- Add TTL-based cache invalidation
+
+**Benefits:**
+- 10-100x faster recommendations (100ms → <10ms)
+- Reduced Personalize API calls (cost savings)
+- Better user experience
+
+**Estimated effort:** 4-6 hours
+**Cost impact:** +$10-30/month
+
+### 3. **Async Processing** (For high-volume events)
+- Replace Kinesis with SQS + DLQ for reliability
+- Add batch processing capabilities
+- Implement error handling and retries
+
+**Benefits:**
+- Better error handling
+- Event replay capability
+- Decoupled components
+
+**Estimated effort:** 3-5 hours
+**Cost impact:** +$5-15/month
+
+### 4. **Advanced Monitoring** (For production reliability)
+- Add X-Ray distributed tracing
+- Create CloudWatch dashboards
+- Set up SNS notifications for errors
+- Add custom metrics
+
+**Benefits:**
+- Faster debugging
+- Real-time visibility
+- Proactive alerts
+
+**Estimated effort:** 2-3 hours
+**Cost impact:** +$10-20/month
+
+### 5. **Data Lake & Analytics** (For insights)
+- Implement S3 data partitioning
+- Add AWS Glue for ETL
+- Enable Athena for SQL queries
+- Create QuickSight dashboards
+
+**Benefits:**
+- Historical analysis
+- Business intelligence
+- Cost optimization insights
+
+**Estimated effort:** 8-12 hours
+**Cost impact:** +$20-50/month
+
+### 6. **CI/CD Pipeline** (For automated deployments)
+- Set up GitHub Actions or CodePipeline
+- Add automated testing
+- Implement blue/green deployments
+- Add approval workflows
+
+**Benefits:**
+- Faster iterations
+- Reduced human errors
+- Better code quality
+
+**Estimated effort:** 4-6 hours
+**Cost impact:** Minimal ($0-10/month)
+
+### 7. **Multi-Region Deployment** (For disaster recovery)
+- Set up cross-region replication
+- Implement failover mechanisms
+- Add Route 53 health checks
+- Create backup strategies
+
+**Benefits:**
+- High availability
+- Disaster recovery
+- Geographic redundancy
+
+**Estimated effort:** 12-16 hours
+**Cost impact:** 2x infrastructure cost
+
+### 8. **Cost Optimization** (To reduce AWS spend)
+- Implement S3 lifecycle policies
+- Use Lambda Reserved Concurrency
+- Set up budget alerts
+- Optimize data transfer costs
+
+**Benefits:**
+- 20-40% cost reduction
+- Better resource utilization
+- Budget predictability
+
+**Estimated effort:** 2-3 hours
+**Cost impact:** -20-40% of current spend
+
+### Recommended Priority (by ROI):
+
+1. **Phase 1 (Immediate):** Caching Layer + Advanced Monitoring
+   - High impact, moderate effort
+   - Essential for production
+   - Investment: 6-9 hours
+
+2. **Phase 2 (Next Sprint):** CI/CD Pipeline + Cost Optimization
+   - Increases developer productivity
+   - Reduces costs
+   - Investment: 6-9 hours
+
+3. **Phase 3 (Future):** Data Lake + Multi-Region
+   - Strategic enhancements
+   - Plan for growth
+   - Investment: 20-28 hours
+
+### Code Examples Available
+
+Refer to `OPTIONAL_FEATURES.md` for detailed Terraform code snippets for each enhancement. Each section includes:
+- Complete Terraform configuration
+- AWS CLI examples
+- Lambda function updates
+- Testing instructions
+
+---
+
 ## 📝 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🤝 Contributing
+
+Contributions are welcome! See CONTRIBUTING.md for guidelines.
